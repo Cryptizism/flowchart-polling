@@ -54,10 +54,6 @@ const calculateLayout = (outcomes: Prisma.OutcomeGetPayload<{}>[]): Record<numbe
     return storage;
 };
 
-const findOutcomeInLayout = (layout: Record<number, LayoutItem>, id: number): LayoutItem | null => {
-    return layout[id] || null;
-};
-
 export default function Graph() {
     const [outcomes, setOutcomes] = useState<Prisma.OutcomeGetPayload<{}>[]>([]);
     const [layout, setLayout] = useState<Record<number, LayoutItem>>({});
@@ -80,7 +76,6 @@ export default function Graph() {
 
     return (
         <div className="relative w-full h-screen">
-            {/* for each outcome display it */}
             {layout && Object.values(layout).map((item, index) => {
                 const x = (item.offset + item.distance) * 100;
                 const y = item.height * 100;
