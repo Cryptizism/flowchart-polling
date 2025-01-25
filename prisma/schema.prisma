@@ -10,11 +10,35 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Post {
+model State {
     id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    currentOutcome Outcome? @relation(fields: [currentOutcomeid], references: [id])
+    currentOutcomeid Int?
+}
 
-    @@index([name])
+model Outcome {
+    id            Int     @id @default(autoincrement())
+    title         String
+    decision1 Outcome? @relation("OutcomeToOutcome1", fields: [decision1ID], references: [id])
+    decision2 Outcome? @relation("OutcomeToOutcome2", fields: [decision2ID], references: [id])
+    decision1Text String ?
+    decision2Text String ?
+    decision1ID   Int?
+    decision2ID   Int?
+    flair         Flair? @relation(fields: [flairid], references: [id])
+    flairid Int?
+
+    state State[]
+
+    previousOutcome1 Outcome[] @relation("OutcomeToOutcome1")
+    previousOutcome2 Outcome[] @relation("OutcomeToOutcome2")
+}
+
+model Flair {
+    id          Int     @id @default(autoincrement())
+    title       String
+    description String
+    colour      String
+
+    Outcome Outcome[]
 }
