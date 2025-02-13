@@ -99,8 +99,8 @@ function Graph() {
 
         if (!target) return;
 
-        const ex = target.getBoundingClientRect().right;
-        const ey = target.getBoundingClientRect().top;
+        const ex = target.getBoundingClientRect().right - 48;
+        const ey = target.getBoundingClientRect().top - 48;
 
         const mx = (cx + ex) / 2;
 
@@ -110,7 +110,7 @@ function Graph() {
                 <text x={cx + 10} y={identifier === "top" ? cy : cy + referenceElem.getBoundingClientRect().height / 2} textAnchor="start" dy="1em" fill='#9f9fa9'>{targetText}</text>
                 <line x1={cx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={cy + referenceElem.getBoundingClientRect().height / 2} stroke="#3f3f47" />
                 <line x1={mx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={ey + target.getBoundingClientRect().height / 2} stroke="#3f3f47" />
-                <line x1={mx} y1={ey + target.getBoundingClientRect().height / 2} x2={target.getBoundingClientRect().left} y2={ey + target.getBoundingClientRect().height / 2} stroke="#3f3f47" markerEnd="url(#arrow)" />
+                <line x1={mx} y1={ey + target.getBoundingClientRect().height / 2} x2={target.getBoundingClientRect().left - 48} y2={ey + target.getBoundingClientRect().height / 2} stroke="#3f3f47" markerEnd="url(#arrow)" />
             </g>
         );
     };
@@ -119,6 +119,7 @@ function Graph() {
     const renderLines = () => {
         const lines: JSX.Element[] = [];
         let maxWidth = 0;
+        let maxHeight = 0;
 
         lines.push(
             <defs key="defs">
@@ -133,10 +134,13 @@ function Graph() {
             const layoutItem = layout[id];
             if (!layoutItem) return;
 
-            const cx = (item as HTMLElement).getBoundingClientRect().right;
-            const cy = (item as HTMLElement).getBoundingClientRect().top;
+            const cx = (item as HTMLElement).getBoundingClientRect().right - 48;
+            const cy = (item as HTMLElement).getBoundingClientRect().top - 48;
+
+            const bottom = (item as HTMLElement).getBoundingClientRect().bottom;
 
             if (cx > maxWidth) maxWidth = cx;
+            if (bottom > maxHeight) maxHeight = bottom;
 
             if (layoutItem.decision1ID && layoutItem.decision1Text) {
                 calcLines((item as HTMLElement), cx, cy, layoutItem.decision1ID, layoutItem.decision1Text, "top", lines);
@@ -149,27 +153,43 @@ function Graph() {
 
         const svgElement = document.getElementById('graph-lines') as SVGElement | null;
         if (svgElement) {
+            svgElement.setAttribute('height', `${maxHeight}px`);
             svgElement.setAttribute('width', `${maxWidth}px`);
+        }
+
+        const graphElement = document.getElementById('graph') as HTMLElement | null;
+        if (graphElement) {
+            graphElement.style.height = `${(maxHeight < window.innerHeight/2)? maxHeight : window.innerHeight/2}px`;
+            graphElement.style.width = `${maxWidth}px`;
         }
 
         return lines;
     };
 
     return (
-        <div className="relative w-[100%-1rem] h-screen overflow-auto bg-zinc-900 text-white" id="graph">
-            {layout && Object.values(layout).map((item) => {
-                const x = (item.offset + item.distance) * 420;
-                const y = item.height * 100;
-                return (
-                    <div key={item.id} id={`graph-item-${item.id}`} className={`graph-item absolute border-zinc-700 bg-zinc-800 border p-2 rounded-md ${current === item.id && "outline outline-4 outline-green-500"}`} style={{ left: `${x}px`, top: `${y}px`, width: "200px" }}>
-                        {item.title}
-                    </div>
-                );
-            })
-            }
-            <svg className="absolute top-0 left-0 min-w-full h-[50vh]" id="graph-lines">
-                {renderLines()}
-            </svg>
+        <div className='bg-zinc-900 text-white w-screen min-h-screen p-6'>
+            <div className='p-6 overflow-auto' style={
+                {
+                    backgroundImage: "linear-gradient(to right, rgba(63, 63, 71, 0.2) 1px, transparent 1px),linear-gradient(to bottom, rgba(63, 63, 71, 0.2) 1px, transparent 1px)",
+                    backgroundSize: "32px 32px",
+                }
+            }>
+                <div className="relative h-screen w-screen" id="graph">
+                    {layout && Object.values(layout).map((item) => {
+                        const x = (item.offset + item.distance) * 420;
+                        const y = item.height * 100;
+                        return (
+                            <div key={item.id} id={`graph-item-${item.id}`} className={`graph-item absolute border-zinc-700 bg-zinc-800 border p-2 rounded-md ${current === item.id && "outline outline-4 outline-green-500"}`} style={{ left: `${x}px`, top: `${y}px`, width: "200px" }}>
+                                {item.title}
+                            </div>
+                        );
+                    })
+                    }
+                    <svg className="absolute top-0 left-0 min-w-full h-screen pointer-events-none" id="graph-lines">
+                        {renderLines()}
+                    </svg>
+                </div>
+            </div>
             <button onClick={() => startPoll(10)} className="absolute bottom-0 right-0 p-2 bg-blue-500 text-white rounded-md">Start Poll</button>
         </div>
     );
