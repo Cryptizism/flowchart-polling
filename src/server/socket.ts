@@ -24,7 +24,7 @@ class SocketServer {
             },
         });
 
-        const tmiClient = tmi.client({
+        const tmiClient = globalThis.socketServer || tmi.client({
             channels: ["CrypticCriticism"],
         });
 
