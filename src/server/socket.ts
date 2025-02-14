@@ -9,6 +9,8 @@ declare global {
 
 class SocketServer {
     private static pollActive: boolean = false;
+    private static overlayActive: boolean = false;
+    private static pollDetails: { title: string, decision1: string, decision2: string } | null = null;
     private static votes: { "1": string[], "2": string[] } = { "1": [], "2": [] };
 
     private constructor() {
@@ -60,6 +62,23 @@ class SocketServer {
         io.on("connection", (socket) => {
             console.log("A user connected:", socket.id);
 
+            // Send current states
+            socket.emit("poll:active", this.pollActive);
+            socket.emit("poll:overlay", this.overlayActive);
+            socket.emit("poll:votes", {
+                "1": this.votes["1"].length,
+                "2": this.votes["2"].length,
+            });
+            if (this.pollDetails) {
+                socket.emit("poll:details", {
+                    decisions: {
+                        "1": this.pollDetails.decision1,
+                        "2": this.pollDetails.decision2,
+                    },
+                    title: this.pollDetails.title,
+                });
+            }
+
             socket.on("disconnect", () => {
                 console.log("A user disconnected:", socket.id);
             });
@@ -74,20 +93,72 @@ class SocketServer {
         return io;
     }
 
-    public static startPoll(duration: number, socket: any) {
-        this.pollActive = true;
-        this.votes = { "1": [], "2": [] };
-        socket.emit("poll:started");
-        console.log("Poll active for", duration, "seconds.");
-
-        setTimeout(async () => {
-            await this.endPoll(socket);
-        }, duration * 1000);
+    public static async toggleOverlay(active: boolean, socket: any) {
+        this.overlayActive = active;
+        socket.emit("poll:overlay", active);
     }
 
-    private static async endPoll(socket: any) {
+    public static startCustomPoll(title: string, duration: number, socket: any, decision1: string, decision2: string) {
+        this.startPollCommon(duration, socket, { title, decision1, decision2 });
+    }
+
+    public static async startPoll(duration: number, socket: any) {
+        const currentOutcome = await db.state.findFirst({
+            include: {
+                currentOutcome: true,
+            }
+        });
+
+        const title = currentOutcome?.currentOutcome?.title;
+        const decision1 = currentOutcome?.currentOutcome?.decision1Text;
+        const decision2 = currentOutcome?.currentOutcome?.decision2Text;
+
+        if (!title || !decision1 || !decision2) {
+            return;
+        }
+
+        this.startPollCommon(duration, socket, { title, decision1, decision2 }, currentOutcome);
+    }
+
+    private static startPollCommon(duration: number, socket: any, details: { title: string, decision1: string, decision2: string }, currentOutcome?: any) {
+        this.pollActive = true;
+        this.votes = { "1": [], "2": [] };
+        socket.emit("poll:active", true);
+        this.pollDetails = details;
+        socket.emit("poll:details", {
+            decisions: {
+                "1": details.decision1,
+                "2": details.decision2,
+            },
+            title: details.title,
+            duration
+        });
+        socket.emit("poll:votes", {
+            "1": this.votes["1"].length,
+            "2": this.votes["2"].length,
+        })
+        socket.emit("poll:countdown", duration);
+
+
+        console.log("Poll active for", duration, "seconds.");
+        
+        const interval = setInterval(() => {
+            duration--;
+            socket.emit("poll:countdown", duration);
+            if (duration <= 0) {
+                clearInterval(interval);
+                if (currentOutcome) {
+                    this.endPoll(socket, currentOutcome);
+                } else {
+                    this.endCustomPoll(socket);
+                }
+            }
+        }, 1000);
+    }
+
+    private static async endPoll(socket: any, currentOutcome?: any) {
         this.pollActive = false;
-        socket.emit("poll:ended");
+        socket.emit("poll:active", false);
         console.log("Poll ended. Results:", {
             "1": this.votes["1"].length,
             "2": this.votes["2"].length,
@@ -97,11 +168,6 @@ class SocketServer {
             return;
         } else if (this.votes["1"].length > this.votes["2"].length) {
             socket.emit("poll:winner", 1);
-            const currentOutcome = await db.state.findFirst({
-                include: {
-                    currentOutcome: true,
-                }
-            })
             const newOutcome = currentOutcome?.currentOutcome?.decision1ID;
             if (newOutcome) {
                 socket.emit("outcome:change", newOutcome);
@@ -112,11 +178,6 @@ class SocketServer {
             }
         } else {
             socket.emit("poll:winner", 2);
-            const currentOutcome = await db.state.findFirst({
-                include: {
-                    currentOutcome: true,
-                }
-            })
             const newOutcome = currentOutcome?.currentOutcome?.decision2ID;
             if (newOutcome) {
                 socket.emit("outcome:change", newOutcome);
@@ -125,6 +186,23 @@ class SocketServer {
                     data: { currentOutcomeid: newOutcome }
                 });
             }
+        }
+    }
+
+    private static endCustomPoll(socket: any) {
+        this.pollActive = false;
+        socket.emit("poll:active", false);
+        console.log("Poll ended. Results:", {
+            "1": this.votes["1"].length,
+            "2": this.votes["2"].length,
+        });
+
+        if (this.votes["1"].length == this.votes["2"].length) {
+            return;
+        } else if (this.votes["1"].length > this.votes["2"].length) {
+            socket.emit("poll:winner", 1);
+        } else {
+            socket.emit("poll:winner", 2);
         }
     }
 
