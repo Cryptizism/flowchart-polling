@@ -27,6 +27,7 @@ model Outcome {
     decision2ID   Int?
     flair         Flair? @relation(fields: [flairid], references: [id])
     flairid Int?
+    duration      Int    @default(30)
 
     state State[]
 

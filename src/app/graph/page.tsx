@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { io } from 'socket.io-client';
 import type { Prisma } from "@prisma/client";
-import { getCurrentOutcome, getOutcomes, initSocket, startPoll, setCurrentOutcome, startCustomPoll, toggleOverlay } from "../actions/actions";
+import { getCurrentOutcome, getOutcomes, initSocket, startPoll, setCurrentOutcome, startCustomPoll, toggleOverlay, selectWinnerManually } from "../actions/actions";
 import { JSX, use, useEffect, useState } from "react";
 
 interface LayoutItem {
@@ -26,13 +26,35 @@ const calculateLayout = (outcomes: Prisma.OutcomeGetPayload<{}>[]): Record<numbe
 
     const discover = (id: number, offset: number, height: number = 0) => {
         const outcome = outcomes.find(outcome => outcome.id === id);
-        if (!outcome) return 0;
+        if (!outcome) return;
 
         const existingOutcome = storage[outcome.id];
         if (existingOutcome) {
             const distance = offset - existingOutcome.offset;
             existingOutcome.distance = Math.max(existingOutcome.distance, distance);
-            return existingOutcome.height;
+            // update decision1 and decision2 with new offset if it is larger
+            if (outcome.decision1ID) {
+                const decision1 = storage[outcome.decision1ID];
+                if (decision1) {
+                    const oldoffset = decision1.offset;
+                    decision1.offset = Math.max(decision1.offset, existingOutcome.offset + existingOutcome.distance + 1);
+                    if (oldoffset !== decision1.offset) {
+                        discover(decision1.id, decision1.offset, decision1.height);
+                    }
+                }
+            }
+
+            if (outcome.decision2ID) {
+                const decision2 = storage[outcome.decision2ID];
+                if (decision2) {
+                    const oldoffset = decision2.offset;
+                    decision2.offset = Math.max(decision2.offset, existingOutcome.offset + existingOutcome.distance + 1);
+                    if (oldoffset !== decision2.offset) {
+                        discover(decision2.id, decision2.offset, decision2.height);
+                    }
+                }
+            }
+            return;
         }
 
         const layoutItem: LayoutItem = {
@@ -49,12 +71,12 @@ const calculateLayout = (outcomes: Prisma.OutcomeGetPayload<{}>[]): Record<numbe
         storage[outcome.id] = layoutItem;
 
         if (outcome.decision1ID && outcome.decision2ID) {
+            if ( outcome.decision1ID === 6) {
+                console.log(`Outcome ${outcome.id} has decision1 ${outcome.decision1ID} and decision2 ${outcome.decision2ID}`);
+                console.log(`Offset: ${offset}, Height: ${height}`);
+            }
             discover(outcome.decision1ID, offset + 1, height);
             discover(outcome.decision2ID, offset + 1, height + 1);
-        } else if (outcome.decision1ID) {
-            discover(outcome.decision1ID, offset + 1, height);
-        } else if (outcome.decision2ID) {
-            discover(outcome.decision2ID, offset + 1, height);
         }
     };
 
@@ -119,19 +141,20 @@ function Graph() {
         const ex = target.getBoundingClientRect().right - 48;
         const ey = target.getBoundingClientRect().top - 48;
 
-        const mx = (cx + ex) / 2 - 32;
+        const mx = (cx + ex) / 2;
 
+        const isCurrentOutcome = referenceElem.id.replace('graph-item-', '') === current?.toString();
 
         lines.push(
             <g id={`${referenceElem.id}-${target.id}-${identifier}`} key={`${referenceElem.id}-${target.id}-${identifier}`}>
-                <foreignObject x={cx + 10} y={identifier === "top" ? cy : cy + referenceElem.getBoundingClientRect().height / 2} width="150" height="20">
-                    <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-gray-400">
+                <foreignObject x={cx + 10} y={identifier === "top" ? cy : cy + referenceElem.getBoundingClientRect().height / 2} width={mx-cx-16} height="20">
+                    <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-gray-400 pointer-events-auto" title={targetText}>
                         {targetText}
                     </p>
                 </foreignObject>
-                <line x1={cx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={cy + referenceElem.getBoundingClientRect().height / 2} stroke="#3f3f47" />
-                <line x1={mx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={ey + target.getBoundingClientRect().height / 2} stroke="#3f3f47" />
-                <line x1={mx} y1={ey + target.getBoundingClientRect().height / 2} x2={target.getBoundingClientRect().left - 48} y2={ey + target.getBoundingClientRect().height / 2} stroke="#3f3f47" markerEnd="url(#arrow)" />
+                <line x1={cx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={cy + referenceElem.getBoundingClientRect().height / 2} stroke={isCurrentOutcome ? '#22c55e' : `#3f3f47`} />
+                <line x1={mx} y1={cy + referenceElem.getBoundingClientRect().height / 2} x2={mx} y2={ey + target.getBoundingClientRect().height / 2} stroke={isCurrentOutcome ? '#22c55e' : `#3f3f47`} />
+                <line x1={mx} y1={ey + target.getBoundingClientRect().height / 2} x2={target.getBoundingClientRect().left - 48} y2={ey + target.getBoundingClientRect().height / 2} stroke={isCurrentOutcome ? '#22c55e' : `#3f3f47`} markerEnd="url(#arrow)" />
             </g>
         );
     };
@@ -141,6 +164,9 @@ function Graph() {
         const lines: JSX.Element[] = [];
         let maxWidth = 0;
         let maxHeight = 0;
+        const graphElement = document.getElementById('graph') as HTMLElement | null;
+
+        if (!graphElement) return lines;
 
         lines.push(
             <defs key="defs">
@@ -178,7 +204,6 @@ function Graph() {
             svgElement.setAttribute('width', `${maxWidth}px`);
         }
 
-        const graphElement = document.getElementById('graph') as HTMLElement | null;
         if (graphElement) {
             graphElement.style.height = `${(maxHeight < window.innerHeight/2)? maxHeight : window.innerHeight/2}px`;
             graphElement.style.width = `${maxWidth}px`;
@@ -201,7 +226,7 @@ function Graph() {
                         const y = item.height * 100;
                         return (
                             <div key={item.id} id={`graph-item-${item.id}`} className={`graph-item absolute border-zinc-700 bg-zinc-800 border p-2 rounded-md z-10 ${current === item.id && "outline outline-2 outline-green-500"}`} style={{ left: `${x}px`, top: `${y}px`, width: "200px" }}>
-                                {item.title}
+                                ({item.id}) {item.title}
                             </div>
                         );
                     })
@@ -214,20 +239,30 @@ function Graph() {
             <div className='flex'>
                 <div className="flex flex-col m-3 p-3 rounded-md w-fit max-w-96 gap-2  bg-zinc-800">
                     <h2 className="text-2xl">Outcomes</h2>
-                    <ul className='flex flex-col gap-1 overflow-y-scroll max-h-[28vh]'>
+                    <ul className='flex flex-col gap-1 overflow-y-scroll max-h-[30vh] border-2 rounded-md border-zinc-500'>
                         {outcomes.map(outcome => (
-                            <li key={outcome.id} className='odd:bg-zinc-700 even:bg-zinc-800 px-2 py-1'>{outcome.title}</li>
+                            <li 
+                                key={outcome.id} 
+                                className='odd:bg-zinc-700 even:bg-zinc-800 px-2 py-1 cursor-pointer hover:bg-zinc-600'
+                                onClick={() => {
+                                    const element = document.getElementById(`graph-item-${outcome.id}`);
+                                    if (element) {
+                                        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                                    }
+                                }}
+                            >
+                                {outcome.title}
+                            </li>
                         ))}
                     </ul>
                     {/* TODO: Implement */}
-                    <button className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Create Outcome</button>
+                    {/* <button className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Create Outcome</button> */}
                 </div>
                 <div className="flex flex-col m-3 p-3 rounded-md w-fit max-w-96 gap-2 h-fit max-h-[40vh] overflow-auto bg-zinc-800">
                     <h2 className="text-2xl">Current State</h2>
-                    <p>Outcome: {current}</p>
-                    <p>Outcome Title: {layout[current!]?.title}</p>
-                    <p>Outcome Decision 1: {layout[current!]?.decision1ID}</p>
-                    <p>Outcome Decision 2: {layout[current!]?.decision2ID}</p>
+                    <p><span className='font-bold'>Outcome: </span>({current}) {layout[current!]?.title}</p>
+                    <p><span className='font-bold'>Decision 1: </span>({layout[current!]?.decision1ID}) {layout[layout[current!]?.decision1ID || -1]?.title}</p>
+                    <p><span className='font-bold'>Decision 2: </span>({layout[current!]?.decision2ID}) {layout[layout[current!]?.decision2ID || -1]?.title}</p>
                     <label htmlFor="outcome" className='mt-4'>Change Outcome</label>
                     <input id="outcome" type="number" className='px-1 border border-zinc-700 bg-zinc-800' defaultValue={current!}/>
                     <button 
@@ -255,7 +290,7 @@ function Graph() {
                     <p>Duration: {pollDuration} seconds</p>
                     <p>Decision 1 Votes: {votes["1"]}</p>
                     <p>Decision 2 Votes: {votes["2"]}</p>
-                    <button onClick={() => startPoll(10)} className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Start Outcome Poll</button>
+                    <button onClick={() => startPoll()} disabled={pollActive} className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Start Outcome Poll</button>
                 </div>
                 <div className="flex flex-col m-3 p-3 rounded-md max-w-96 gap-2 h-fit max-h-[40vh] overflow-auto bg-zinc-800">
                     <h2 className="text-2xl">Custom Poll</h2>
@@ -273,8 +308,20 @@ function Graph() {
                         const decision2Input = document.getElementById('decision2') as HTMLInputElement;
                         const durationInput = document.getElementById('duration') as HTMLInputElement;
                         startCustomPoll(titleInput.value, parseInt(durationInput.value), decision1Input.value, decision2Input.value);
-                    }} className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Start Poll</button>
+                    }}
+                    disabled={pollActive}
+                    className={`${pollActive && 'hover:cursor-not-allowed'} border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg`}>Start Poll</button>
                 </div>
+                {!pollActive && (
+                    <div className="flex flex-col m-3 p-3 rounded-md max-w-96 gap-2 h-fit max-h-[40vh] overflow-auto bg-zinc-800">
+                        <h2 className="text-2xl">Select A Winner</h2>
+                        <p className='text-sm w-48'>Will go based on what's under "Current State" not what's on the poll overlay<span className="text-red-400">*</span></p>
+                        <div className="flex gap-2">
+                            <button onClick={() => selectWinnerManually(1)} className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Decision 1</button>
+                            <button onClick={() => selectWinnerManually(2)} className='border border-zinc-700 bg-zinc-800 hover:bg-zinc-600 w-fit px-2 py-1 rounded-lg'>Decision 2</button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

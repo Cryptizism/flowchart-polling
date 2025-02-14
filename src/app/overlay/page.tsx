@@ -52,7 +52,7 @@ export default function Overlay() {
     }, []);
 
     return (
-        <div className={`${pt_serif.className} flex flex-col h-screen ${dislayOverlay ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500 ease-in-out justify-end`}>
+        <div className={`${pt_serif.className} flex flex-col h-screen ${dislayOverlay || pollActive ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 ease-in-out justify-end`}>
             <h1 className="text-4xl text-center text-yellow-300 italic tracking-wider" style={
                 { textShadow: '0 0 10px #000, 0 0 10px #000, 0 0 10px #000' }
             }>
@@ -60,7 +60,7 @@ export default function Overlay() {
             </h1>
             <div className={`flex justify-around items-center ${Object.values(pollDetails.decisions).reduce((a, b) => a.length > b.length ? a : b, "").length > 60 ? '' : 'mx-72'} mb-12`}>
                 {(["1", "2"] as const).map((key) => (
-                    <div key={key} className={`flex flex-col text-5xl italic justify-between flex-1 m-4 p-3 h-64 text-center rounded-2xl ${pollActive || winner === parseInt(key) ? 'bg-[rgba(0,0,0,0.7)]' : 'bg-[rgba(0,0,0,0.5)]'} ${pollActive || winner === parseInt(key) ? 'scale-90 text-white' : 'scale-[0.85] text-zinc-400'} ${winner === parseInt(key) ? 'border-4 border-yellow-400' : ''} transition-all duration-300 ease-in-out`}> {/* border-2 border-solid border-zinc-400 */}
+                    <div key={key} className={`flex flex-col ${pollDetails.decisions[key].length > 50 ? 'text-4xl' : 'text-5xl'} italic justify-between flex-1 m-4 p-3 h-64 text-center rounded-2xl ${pollActive || winner === parseInt(key) ? 'bg-[rgba(0,0,0,0.7)]' : 'bg-[rgba(0,0,0,0.5)]'} ${pollActive || winner === parseInt(key) ? 'scale-90 text-white' : 'scale-[0.85] text-zinc-400'} transition-all duration-300 ease-in-out`}> {/* border-2 border-solid border-zinc-400 */}
                         <h1 className='text-left italic'>{key}</h1>
                         <h2 className='italic'>{pollDetails.decisions[key]}</h2>
                         <div className="italic text-right mr-2">

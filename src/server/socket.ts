@@ -82,11 +82,6 @@ class SocketServer {
             socket.on("disconnect", () => {
                 console.log("A user disconnected:", socket.id);
             });
-
-            socket.on("poll:start", (duration: number) => {
-                console.log("Poll started.");
-                this.startPoll(duration, socket);
-            });
         });
 
         globalThis.socketServer = io;
@@ -102,13 +97,14 @@ class SocketServer {
         this.startPollCommon(duration, socket, { title, decision1, decision2 });
     }
 
-    public static async startPoll(duration: number, socket: any) {
+    public static async startPoll(socket: any) {
         const currentOutcome = await db.state.findFirst({
             include: {
                 currentOutcome: true,
             }
         });
 
+        const duration = currentOutcome?.currentOutcome?.duration || 30;
         const title = currentOutcome?.currentOutcome?.title;
         const decision1 = currentOutcome?.currentOutcome?.decision1Text;
         const decision2 = currentOutcome?.currentOutcome?.decision2Text;
@@ -203,6 +199,42 @@ class SocketServer {
             socket.emit("poll:winner", 1);
         } else {
             socket.emit("poll:winner", 2);
+        }
+    }
+
+    public static async selectWinnerManually(socket: any, winner: number) {
+        if (winner !== 1 && winner !== 2) {
+            return;
+        }
+
+        this.pollActive = false;
+        socket.emit("poll:active", false);
+        socket.emit("poll:winner", winner);
+
+        const currentOutcome = await db.state.findFirst({
+            include: {
+                currentOutcome: true,
+            }
+        });
+
+        if (winner === 1) {
+            const newOutcome = currentOutcome?.currentOutcome?.decision1ID;
+            if (newOutcome) {
+                socket.emit("outcome:change", newOutcome);
+                await db.state.update({
+                    where: { id: 1 },
+                    data: { currentOutcomeid: newOutcome }
+                });
+            }
+        } else if (winner === 2) {
+            const newOutcome = currentOutcome?.currentOutcome?.decision2ID;
+            if (newOutcome) {
+                socket.emit("outcome:change", newOutcome);
+                await db.state.update({
+                    where: { id: 1 },
+                    data: { currentOutcomeid: newOutcome }
+                });
+            }
         }
     }
 

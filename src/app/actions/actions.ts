@@ -21,9 +21,9 @@ export const setCurrentOutcome = async (id: number) => {
     socketInstance.emit("outcome:change", id);
 }
 
-export const startPoll = async (duration: number) => {
+export const startPoll = async () => {
     const socketInstance = await socket.getInstance(3001);
-    socket.startPoll(duration, socketInstance);
+    socket.startPoll(socketInstance);
 }
 
 export const startCustomPoll = async (title: string, duration: number, decision1: string, decision2: string) => {
@@ -34,6 +34,11 @@ export const startCustomPoll = async (title: string, duration: number, decision1
 export const toggleOverlay = async (active: boolean) => {
     const socketInstance = await socket.getInstance(3001);
     socket.toggleOverlay(active, socketInstance);
+}
+
+export const selectWinnerManually = async (winner: number) => {
+    const socketInstance = await socket.getInstance(3001);
+    socket.selectWinnerManually(socketInstance, winner);
 }
 
 export const initSocket = async () => {
