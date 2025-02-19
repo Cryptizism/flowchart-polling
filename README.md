@@ -1,6 +1,8 @@
-# Flowchart Polling
+# Flowchart Polling for Twitch
 
 This system was made for the MaxGGs channel and will not be maintained.
+
+This allows a streamer to make a non-circular flowchart for polls and twitch chat gets to decide what routes to take and different polls will show for different scenarios! A bit like detroit become human.
 
 Make sure to edit `.env.example` and change it to `.env`
 
