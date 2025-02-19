@@ -1,29 +1,15 @@
-# Create T3 App
+# Flowchart Polling
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+This system was made for the MaxGGs channel and will not be maintained.
 
-## What's next? How do I make an app with this?
+Make sure to edit `.env.example` and change it to `.env`
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+This code is by far not clean and the actions to communicate are **NOT** proper uses of websockets, **DO NOT** replicate this for your own projects, it just kind of happened whilst finishing most of this project in 2 days.
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Known Issues
+1. The flowchart doesn't work in certain scenarios (notice 23 in the example data)
+2. You cannot add scenarios from the UI only directly in the db
+3. Triggering select winner continues if you double click
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
 
-## Learn More
-
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
-
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
-
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
-
-## How do I deploy this?
-
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+> No errors will be fixed.
