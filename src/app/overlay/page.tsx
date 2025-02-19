@@ -64,7 +64,7 @@ export default function Overlay() {
                         <h1 className='text-left italic'>{key}</h1>
                         <h2 className='italic'>{pollDetails.decisions[key]}</h2>
                         <div className="italic text-right mr-2">
-                            {votes[key] / (votes["1"] + votes["2"]) * 100 || 0}%
+                            {Math.round(votes[key] / (votes["1"] + votes["2"]) * 100) || 0}%
                         </div>
                     </div>
                 ))}

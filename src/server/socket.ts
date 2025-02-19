@@ -12,6 +12,7 @@ class SocketServer {
     private static overlayActive: boolean = false;
     private static pollDetails: { title: string, decision1: string, decision2: string } | null = null;
     private static votes: { "1": string[], "2": string[] } = { "1": [], "2": [] };
+    private static pollType : "CUSTOM" | "DEFAULT";
 
     private constructor() {
     }
@@ -27,7 +28,7 @@ class SocketServer {
         });
 
         const tmiClient = globalThis.socketServer || tmi.client({
-            channels: ["CrypticCriticism"],
+            channels: [process.env.TWITCH_CHANNEL || "CrypticCriticism"],
         });
 
         tmiClient.connect();
@@ -88,16 +89,18 @@ class SocketServer {
         return io;
     }
 
-    public static async toggleOverlay(active: boolean, socket: any) {
+    public static async toggleOverlay(active: boolean, socket: Server) {
         this.overlayActive = active;
         socket.emit("poll:overlay", active);
     }
 
-    public static startCustomPoll(title: string, duration: number, socket: any, decision1: string, decision2: string) {
+    public static startCustomPoll(title: string, duration: number, socket: Server, decision1: string, decision2: string) {
+        this.pollType = "CUSTOM"
         this.startPollCommon(duration, socket, { title, decision1, decision2 });
     }
 
-    public static async startPoll(socket: any) {
+    public static async startPoll(socket: Server) {
+        this.pollType = "DEFAULT"
         const currentOutcome = await db.state.findFirst({
             include: {
                 currentOutcome: true,
@@ -116,7 +119,7 @@ class SocketServer {
         this.startPollCommon(duration, socket, { title, decision1, decision2 }, currentOutcome);
     }
 
-    private static startPollCommon(duration: number, socket: any, details: { title: string, decision1: string, decision2: string }, currentOutcome?: any) {
+    private static startPollCommon(duration: number, socket: Server, details: { title: string, decision1: string, decision2: string }, currentOutcome?: any) {
         this.pollActive = true;
         this.votes = { "1": [], "2": [] };
         socket.emit("poll:active", true);
@@ -152,7 +155,7 @@ class SocketServer {
         }, 1000);
     }
 
-    private static async endPoll(socket: any, currentOutcome?: any) {
+    private static async endPoll(socket: Server, currentOutcome?: any) {
         this.pollActive = false;
         socket.emit("poll:active", false);
         console.log("Poll ended. Results:", {
@@ -185,7 +188,7 @@ class SocketServer {
         }
     }
 
-    private static endCustomPoll(socket: any) {
+    private static endCustomPoll(socket: Server) {
         this.pollActive = false;
         socket.emit("poll:active", false);
         console.log("Poll ended. Results:", {
@@ -202,7 +205,7 @@ class SocketServer {
         }
     }
 
-    public static async selectWinnerManually(socket: any, winner: number) {
+    public static async selectWinnerManually(socket: Server, winner: number) {
         if (winner !== 1 && winner !== 2) {
             return;
         }
@@ -210,6 +213,8 @@ class SocketServer {
         this.pollActive = false;
         socket.emit("poll:active", false);
         socket.emit("poll:winner", winner);
+
+        if (this.pollType === "CUSTOM") return;
 
         const currentOutcome = await db.state.findFirst({
             include: {
